@@ -1,0 +1,62 @@
+# Optional static repository review; no database connection or application install.
+# Run manually from Actions. For automatic migration runs, set the repository
+# Actions variable VIBERAVEN_REVIEW to the exact string true.
+# This scans the full repo, so findings may extend beyond the changed migrations.
+# Public demo SELECT policies can produce intentional, nonblocking warnings.
+# Findings are advisory; scanner/Action errors fail this separate optional job.
+# Existing CI and database deployment do not depend on this job.
+name: Optional migration review
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  pull_request:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    # Automatic runs require an explicit repository variable opt-in.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.VIBERAVEN_REVIEW == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source and comparison history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Review repository evidence
+        id: check
+        uses: ohad6k/viberaven-action@6f23ccee8976b9e2e836e469850286c378a85a8d
+        with:
+          version: '1.6.5'
+          comment: 'false'
+          fail-on-blockers: 'false'
+
+      - name: Surface scanner errors separately from findings
+        if: ${{ always() }}
+        shell: bash
+        env:
+          VR_ACTION_OUTCOME: ${{ steps.check.outcome }}
+          VR_EXIT_CODE: ${{ steps.check.outputs.exit-code }}
+        run: |
+          if [ "$VR_ACTION_OUTCOME" != "success" ]; then
+            echo "::error::Repository review did not complete successfully."
+            exit 1
+          fi
+          case "$VR_EXIT_CODE" in
+            0|1)
+              echo "Repository review completed (scanner exit $VR_EXIT_CODE). Findings are advice only."
+              ;;
+            *)
+              echo "::error::Scanner returned an operational error or no valid result (exit '$VR_EXIT_CODE')."
+              exit 1
+              ;;
+          esac
