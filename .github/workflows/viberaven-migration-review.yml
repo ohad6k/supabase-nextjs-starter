@@ -34,9 +34,9 @@ jobs:
 
       - name: Review repository evidence
         id: check
-        uses: ohad6k/viberaven-action@6f23ccee8976b9e2e836e469850286c378a85a8d
+        uses: ohad6k/viberaven-action@6afc30c9b4a6771cd989008714011cbab56fd9c1
         with:
-          version: '1.6.5'
+          version: '1.6.6'
           comment: 'false'
           fail-on-blockers: 'false'
 
